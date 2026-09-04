@@ -666,19 +666,21 @@ const App: React.FC = () => {
       let currentCat: 'easy' | 'medium' | 'advanced' | null = null;
       lines.forEach((line: string) => {
         const upper = line.toUpperCase();
-        if (upper.includes('EASY')) currentCat = 'easy';
-        else if (upper.includes('MEDIUM')) currentCat = 'medium';
-        else if (upper.includes('ADVANCED')) currentCat = 'advanced';
-        else if (currentCat) {
+        if (upper.includes('EASY PROJECTS') || (upper.includes('EASY') && upper.length < 15)) currentCat = 'easy';
+        else if (upper.includes('MEDIUM PROJECTS') || (upper.includes('MEDIUM') && upper.length < 15)) currentCat = 'medium';
+        else if (upper.includes('ADVANCED PROJECTS') || (upper.includes('ADVANCED') && upper.length < 15)) currentCat = 'advanced';
+        else {
           const parts = line.split('|');
           if (parts.length >= 1) {
             const titlePart = parts[0].replace(/^\d+\.\s*/, '').replace(/Title:\s*/i, '').trim();
             const descPart = parts[1] ? parts[1].replace(/Description:\s*/i, '').trim() : "Academic engineering project exploration.";
-            if (titlePart) {
+            if (titlePart && titlePart.length > 5 && !upper.startsWith('SURE') && !upper.startsWith('HERE ARE')) {
               const idea = { title: titlePart, description: descPart };
-              if (currentCat === 'easy' && easy.length < 5) easy.push(idea);
-              else if (currentCat === 'medium' && medium.length < 5) medium.push(idea);
-              else if (currentCat === 'advanced' && advanced.length < 5) advanced.push(idea);
+              const targetCat = currentCat || (easy.length < 5 ? 'easy' : (medium.length < 5 ? 'medium' : 'advanced'));
+              
+              if (targetCat === 'easy' && easy.length < 5) easy.push(idea);
+              else if (targetCat === 'medium' && medium.length < 5) medium.push(idea);
+              else if (targetCat === 'advanced' && advanced.length < 5) advanced.push(idea);
             }
           }
         }

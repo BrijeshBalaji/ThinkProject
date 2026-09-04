@@ -85,7 +85,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignUp = false }) => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
+          redirectTo: import.meta.env.DEV ? window.location.origin : 'https://think-project-tau.vercel.app'
         }
       });
       if (error) throw error;
