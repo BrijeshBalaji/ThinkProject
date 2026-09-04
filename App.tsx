@@ -402,26 +402,61 @@ const App: React.FC = () => {
   };
 
   const callLyzrAI = async (message: string) => {
+    console.log('[DEBUG] callLyzrAI triggered');
+    console.log('[DEBUG] Validated request payload message length:', message?.length);
+    console.log('[DEBUG] Calling API without exposing secrets...');
+    
     try {
-      const response = await fetch(LYZR_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': LYZR_API_KEY
-        },
-        body: JSON.stringify({
-          user_id: session?.user?.email || "anonymous",
-          agent_id: LYZR_AGENT_ID,
-          session_id: LYZR_SESSION_ID,
-          message: message
-        })
-      });
-      
-      if (!response.ok) throw new Error('API request failed');
-      const data = await response.json();
-      return data.response || "No response content found.";
+      let response;
+      const payload = {
+        user_id: session?.user?.email || "anonymous",
+        agent_id: "696fa434b50537828e0b25c9",
+        session_id: "696fa434b50537828e0b25c9-fa188pi9h9q",
+        message: message
+      };
+
+      if (import.meta.env.DEV) {
+        console.log('[DEBUG] Local Dev: Calling Vite proxy at /api/lyzr to bypass CORS and hide API key');
+        response = await fetch('/api/lyzr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        console.log('[DEBUG] HTTP Status:', response.status);
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error('[DEBUG] Error response body safely parsed:', errText.substring(0, 500));
+          throw new Error('API request failed with status ' + response.status);
+        }
+        
+        const data = await response.json();
+        console.log('[DEBUG] Response parsed successfully. Payload response length:', data?.response?.length || 0);
+        
+        if (!data?.response) {
+          console.log('[DEBUG] WARNING: generated report content is empty or missing expected "response" field!');
+        }
+        
+        return data?.response || "No response content found.";
+      } else {
+        console.log('[DEBUG] Prod: Calling Supabase Edge Function: lyzr-api');
+        const { data: edgeData, error } = await supabase.functions.invoke('lyzr-api', {
+          body: payload
+        });
+        
+        if (error) {
+          console.error('[DEBUG] Edge Function Error:', error);
+          throw error;
+        }
+        
+        console.log('[DEBUG] Edge Function returned successfully');
+        if (!edgeData?.response) {
+          console.log('[DEBUG] WARNING: generated report content is empty or missing expected "response" field!');
+        }
+        return edgeData?.response || "No response content found.";
+      }
     } catch (error) {
-      console.error('Lyzr API Error:', error);
+      console.error('[DEBUG] Lyzr API Error:', error);
       return "Error: Could not connect to the academic agent.";
     }
   };
@@ -483,13 +518,17 @@ const App: React.FC = () => {
   };
 
   const handleGenerateReport = async () => {
+    console.log('[DEBUG] Generate Report clicked');
+    
     const sourceContent = abstract.trim() ? abstract.trim() : (projectTitle.trim() + " " + projectDescription.trim()).trim();
     
     if (!sourceContent) {
+      console.log('[DEBUG] Validation failed: missing source content');
       alert("Please provide a project title or description, or upload an abstract first.");
       return;
     }
 
+    console.log('[DEBUG] Validation passed. Setting loading state...');
     setIsLoading(true);
     setActiveSection('report');
     
@@ -554,7 +593,10 @@ const App: React.FC = () => {
     Ensure the tones are formal. Output EVERYTHING requested using ONLY the LYZR API logic.`;
     
     try {
+      console.log('[DEBUG] About to call Lyzr API proxy...');
       const result = await callLyzrAI(prompt);
+      console.log('[DEBUG] Received response string. Proceeding to split/parse.');
+      
       const separator = "[PLAGIARISM_ANALYSIS_START]";
       const parts = result.split(separator);
       
@@ -565,17 +607,22 @@ const App: React.FC = () => {
         finalReportContent = parts[0].trim();
         finalPlagiarismContent = parts[1].trim();
       } else {
+        console.log('[DEBUG] Response did not contain plagiarism separator.');
         finalReportContent = result;
         finalPlagiarismContent = "AI PLAGIARISM AND ORIGINALITY ANALYSIS:\nAnalysis not found in response. Please regenerate.";
       }
       
+      console.log('[DEBUG] Updating React states (Report Content and Plagiarism Content)');
       setReportContent(finalReportContent);
       setPlagiarismContent(finalPlagiarismContent);
 
-      if (session?.user?.id) {
-        try {
-          if (currentReportId) {
-            const { error: dbError } = await supabase.from('reports').update({
+      console.log('[DEBUG] Auto-saving report to database...');
+      // Only auto-save if we actually got a report back
+      if (finalReportContent && finalReportContent !== "Error: Could not connect to the academic agent." && finalReportContent !== "No response content found.") {
+        if (session?.user?.id) {
+          try {
+            if (currentReportId) {
+              const { error: dbError } = await supabase.from('reports').update({
               project_title: projectTitle,
               department: department,
               project_description: projectDescription,
@@ -616,16 +663,22 @@ const App: React.FC = () => {
             }
           }
         } catch (dbCatchError) {
-          console.error('Exception saving report to database:', dbCatchError);
+          console.error('[DEBUG] Exception saving report to database:', dbCatchError);
           setReportStatus('Report generated, but failed to save to history.');
         }
       } else {
+        console.log('[DEBUG] Skipped auto-save because the report content is invalid or an error message.');
         setReportStatus('');
       }
+      }
+      
+      console.log('[DEBUG] Generation flow completed successfully. Navigating to report view.');
     } catch (error) {
+      console.error('[DEBUG] Caught error in handleGenerateReport:', error);
       alert("API Error: Failed to generate report.");
     } finally {
       setIsLoading(false);
+      console.log('[DEBUG] Loading state reset to false');
     }
   };
 
