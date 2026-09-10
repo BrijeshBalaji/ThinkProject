@@ -9,12 +9,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
+    "@google/genai": "^1.37.0",
+    "@supabase/supabase-js": "^2.112.3",
+    "docx": "^9.7.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.562.0",
-    "mammoth": "1.6.0",
-    "pdfjs-dist": "4.0.379",
-    "@google/genai": "^1.37.0"
+    "mammoth": "^1.12.1",
+    "pdfjs-dist": "^4.10.38",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
